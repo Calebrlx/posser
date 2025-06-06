@@ -7,7 +7,7 @@ mp_pose = mp.solutions.pose
 pose = mp_pose.Pose(static_image_mode=False)
 cap = cv2.VideoCapture(0)
 last_touch_time = None
-cooldown_seconds = 2000
+cooldown_seconds = 2
 
 # def is_touching_head(landmarks):
 #     wrist = landmarks[mp_pose.PoseLandmark.RIGHT_WRIST]
@@ -53,11 +53,18 @@ def is_touching_head(landmarks):
 with open("head_touch_log.csv", "a") as log_file:
     log_file.write("timestamp,event\n")
 
+    frame_count = 0
+    process_every_n = 60
+
     while True:
         ret, frame = cap.read()
         if not ret:
             print("Camera read failed.")
             break
+
+        frame_count += 1
+        if frame_count % process_every_n != 0:
+            continue  # Skip this frame
 
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         results = pose.process(rgb)
@@ -71,3 +78,6 @@ with open("head_touch_log.csv", "a") as log_file:
                 log_file.flush()
 
 cap.release()
+
+
+
