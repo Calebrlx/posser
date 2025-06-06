@@ -4,28 +4,35 @@ import onnxruntime as ort
 from datetime import datetime
 import time
 
-model_path = "bodypix_mobilenet_float_075_224.onnx"
-session = ort.InferenceSession(model_path)
+MODEL_PATH = "bodypix_mobilenet_float_075_224.onnx"
+INPUT_SIZE = (224, 224)
+COOLDOWN_SECONDS = 5
+OVERLAP_THRESHOLD = 200
 
+# Initialize ONNX model
+session = ort.InferenceSession(MODEL_PATH)
+input_name = session.get_inputs()[0].name
+
+# Preprocess frame for model
 def preprocess(frame):
-    resized = cv2.resize(frame, (224, 224))
+    resized = cv2.resize(frame, INPUT_SIZE)
     normalized = resized.astype(np.float32) / 127.5 - 1.0
-    input_tensor = np.transpose(normalized, (2, 0, 1))  # HWC → CHW
-    input_tensor = np.expand_dims(input_tensor, axis=0)  # Batch dim
+    input_tensor = np.expand_dims(normalized, axis=0)  # Batch dimension
     return input_tensor
 
+# Postprocess model output to get segmentation mask
 def postprocess(output, original_shape):
     mask = output[0][0]
-    mask = cv2.resize(mask, (original_shape[1], original_shape[0]), interpolation=cv2.INTER_NEAREST)
-    return mask.astype(np.uint8)
+    mask_resized = cv2.resize(mask, (original_shape[1], original_shape[0]), interpolation=cv2.INTER_NEAREST)
+    return mask_resized.astype(np.uint8)
 
+# Start video capture
 cap = cv2.VideoCapture(0)
 if not cap.isOpened():
     print("Webcam not found.")
     exit()
 
 last_log_time = None
-cooldown = 5  # seconds between logs
 
 with open("hair_touch_log.csv", "a") as log_file:
     log_file.write("timestamp,event\n")
@@ -33,31 +40,31 @@ with open("hair_touch_log.csv", "a") as log_file:
     while True:
         ret, frame = cap.read()
         if not ret:
-            print("Camera read failed.")
+            print("Frame capture failed.")
             break
 
         input_tensor = preprocess(frame)
-        input_name = session.get_inputs()[0].name
         outputs = session.run(None, {input_name: input_tensor})
         mask = postprocess(outputs, frame.shape)
 
-        # These class IDs may vary based on the model's training
-        hand_mask = (mask == 15).astype(np.uint8)
-        hair_mask = (mask == 1).astype(np.uint8)
+        # Adjust class IDs based on your model (verify your model's class labels)
+        HAND_CLASS_ID = 15
+        HAIR_CLASS_ID = 1
 
-        # Compute overlap (intersection)
-        overlap = cv2.bitwise_and(hand_mask, hair_mask)
-        overlap_area = np.sum(overlap)
+        hand_mask = (mask == HAND_CLASS_ID).astype(np.uint8)
+        hair_mask = (mask == HAIR_CLASS_ID).astype(np.uint8)
 
-        if overlap_area > 200:  # Threshold to filter false positives
+        overlap_area = np.sum(cv2.bitwise_and(hand_mask, hair_mask))
+
+        if overlap_area > OVERLAP_THRESHOLD:
             now = datetime.now()
-            if not last_log_time or (now - last_log_time).total_seconds() > cooldown:
+            if last_log_time is None or (now - last_log_time).total_seconds() >= COOLDOWN_SECONDS:
                 last_log_time = now
-                print(f"[{now.isoformat()}] Touch Detected")
-                log_file.write(f"{now.isoformat()},touch_detected\n")
+                log_entry = f"{now.isoformat()},touch_detected\n"
+                print(log_entry.strip())
+                log_file.write(log_entry)
                 log_file.flush()
 
-        # Run at ~0.5 fps
-        time.sleep(2)
+        time.sleep(2)  # Throttle to ~0.5 FPS
 
 cap.release()
