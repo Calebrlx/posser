@@ -20,9 +20,10 @@ def preprocess(frame):
     input_tensor = np.expand_dims(normalized, axis=0)  # Batch dimension
     return input_tensor
 
-# Postprocess model output to get segmentation mask
-def postprocess(output, original_shape):
-    mask = output[0][0]
+# Postprocess model output to get segmentation mask (from heatmap or segments)
+def postprocess(outputs, original_shape):
+    segments = outputs[0]  # float_segments:0
+    mask = segments[0, :, :, 0]  # Use first (and only) channel of float_segments
     mask_resized = cv2.resize(mask, (original_shape[1], original_shape[0]), interpolation=cv2.INTER_NEAREST)
     return mask_resized.astype(np.uint8)
 
@@ -47,14 +48,21 @@ with open("hair_touch_log.csv", "a") as log_file:
         outputs = session.run(None, {input_name: input_tensor})
         mask = postprocess(outputs, frame.shape)
 
-        # Adjust class IDs based on your model (verify your model's class labels)
-        HAND_CLASS_ID = 15
-        HAIR_CLASS_ID = 1
+        # Debug: print unique class labels in the segmentation output
+        unique_labels = np.unique(mask)
+        print(f"[DEBUG] Unique labels in mask: {unique_labels}")
+
+        # Assumption: label IDs must be identified empirically
+        HAND_CLASS_ID = 15  # Placeholder - may need adjustment
+        HAIR_CLASS_ID = 1   # Placeholder - may need adjustment
 
         hand_mask = (mask == HAND_CLASS_ID).astype(np.uint8)
         hair_mask = (mask == HAIR_CLASS_ID).astype(np.uint8)
 
-        overlap_area = np.sum(cv2.bitwise_and(hand_mask, hair_mask))
+        overlap = cv2.bitwise_and(hand_mask, hair_mask)
+        overlap_area = np.sum(overlap)
+
+        print(f"[DEBUG] Overlap area: {overlap_area}")
 
         if overlap_area > OVERLAP_THRESHOLD:
             now = datetime.now()
