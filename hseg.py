@@ -37,7 +37,8 @@ with open("hair_touch_log.csv", "a") as log_file:
             break
 
         input_tensor = preprocess(frame)
-        outputs = session.run(None, {"input": input_tensor})
+        input_name = session.get_inputs()[0].name
+        outputs = session.run(None, {input_name: input_tensor})
         mask = postprocess(outputs, frame.shape)
 
         # These class IDs may vary based on the model's training
