@@ -7,7 +7,7 @@ mp_pose = mp.solutions.pose
 pose = mp_pose.Pose(static_image_mode=False)
 cap = cv2.VideoCapture(0)
 last_touch_time = None
-cooldown_seconds = 2
+cooldown_seconds = 2000
 
 # def is_touching_head(landmarks):
 #     wrist = landmarks[mp_pose.PoseLandmark.RIGHT_WRIST]
