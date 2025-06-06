@@ -1,0 +1,23 @@
+# Ignore ONNX model weights
+*.onnx
+*.onnx.meta
+BodyPixOnnx.zip
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environments
+cv-env/
+env/
+.venv/
+
+# Logs
+*.log
+*.csv
+head_touch_log.csv
+
+# OS metadata
+.DS_Store
+Thumbs.db
